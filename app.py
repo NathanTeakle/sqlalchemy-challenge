@@ -96,32 +96,79 @@ def tobs():
     tobs_data = [result.tobs for result in results]
     return jsonify(tobs_data)
 
-@app.route('/api/v1.0/<start>')
-@app.route('/api/v1.0/<start>/<end>')
-def start_end(start, end=None):
+@app.route("/api/v1.0/<start>")
+def temperature_stats(start):
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    if end:
-        # For a specified start date and end date, calculate TMIN, TAVG, and TMAX for the dates from the start date to the end date, inclusive
-        results = session.query(func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)).filter(Measurement.date >= start).filter(Measurement.date <= end).all()
-        temp_data = {
-            'TMIN': results[0][0],
-            'TAVG': results[0][1],
-            'TMAX': results[0][2]
-        }
-        return jsonify(temp_data)
-    else:
-        # For a specified start, calculate TMIN, TAVG, and TMAX for all the dates greater than or equal to the start date
-        results = session.query(func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)).filter(Measurement.date >= start).all()
-        temp_data = {
-            'TMIN': results[0][0],
-            'TAVG': results[0][1],
-            'TMAX': results[0][2]
-        }
-        return jsonify(temp_data)
+    # Query the minimum, maximum, and average temperatures from the given start date to the end of the dataset
+    results = session.query(func.min(Measurement.tobs), func.max(Measurement.tobs), func.avg(Measurement.tobs)).\
+        filter(Measurement.date >= start).\
+        all()
 
-if __name__ == '__main__':
+    
+    #latest date for final output
+    latest_date = session.query(func.max(Measurement.date)).scalar()
+    # Close Session
+    session.close()
+
+    # Check if any results are found
+    if results:
+        # Extract the temperature statistics from the results tuple
+        min_temp = results[0][0]
+        max_temp = results[0][1]
+        avg_temp = results[0][2]
+
+        # Create a dictionary to hold the temperature statistics
+        temperature_stats = {
+            "start_date": start,
+            "end_date": latest_date,
+            "min_temp": min_temp,
+            "max_temp": max_temp,
+            "avg_temp": avg_temp
+        }
+
+        return jsonify(temperature_stats)
+    else:
+        return jsonify({"Error"})
+
+##/api/v1.0/<start>/<end>
+@app.route("/api/v1.0/<start>/<end>")
+def temperature_stats_end(start, end):
+    # Create our session (link) from Python to the DB
+    session = Session(engine)
+
+    # Query the minimum, maximum, and average temperatures from the given start date to the end of the dataset
+    results = session.query(func.min(Measurement.tobs), func.max(Measurement.tobs), func.avg(Measurement.tobs)).\
+        filter(Measurement.date >= start).filter(Measurement.date <= end).\
+        all()
+
+    # Close Session
+    session.close()
+
+    # Check if any results are found
+    if results:
+        # Extract the temperature statistics from the results tuple
+        min_temp = results[0][0]
+        max_temp = results[0][1]
+        avg_temp = results[0][2]
+
+        # Create a dictionary to hold the temperature statistics
+        stats_end = {
+            "start_date": start,
+            "end_date": end,
+            "min_temp": min_temp,
+            "max_temp": max_temp,
+            "avg_temp": round(avg_temp,2)
+        }
+
+        return jsonify(stats_end)
+    else:
+        return jsonify({"error": "No results found"})
+    
+#Make runable from terminal
+if __name__ == "__main__":
     app.run(debug=True)
+
 
 
